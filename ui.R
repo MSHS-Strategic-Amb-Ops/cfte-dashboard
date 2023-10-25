@@ -6,10 +6,10 @@ library(shinydashboard)
 # Filter Choices ---------------------------------------------------------------
 ## Reporting Month Choices
 month_choices <- unique(sort(cpsc_data$Month, decreasing = T))
-default_month <- default_month[1]
+default_month <- month_choices[1]
 ## Reporting Department Choices
 dept_choices <- sort(unique((cpsc_data %>% filter(Month == default_month))$MasterDept))
-default_dept <- default_dept[1]
+default_dept <- dept_choices[1]
 ## Reporting CPSC Specialty Choices
 specialty_choices <- sort(unique((cpsc_data %>% 
                                     filter(Month == default_month) %>% 
@@ -158,14 +158,34 @@ ui <-
                                                          textInput("cpsc_data_submission_name", (labelMandatory("1. Enter your name:")), "")
                                                   )
                                                 ),
-                                                h2("2. Update any changes in the table below:"),
-                                                h2("3. When updates are complete, click on Submit Button below:"),
+                                                fluidRow(
+                                                  h2("2. Select Department CPSC CFTE data is submitted for:"),
+                                                  column(2, 
+                                                         box(
+                                                           title = NULL, solidHeader = FALSE, width = 12,
+                                                           pickerInput("selectedDept_cpsc_submission", label = h4("Select Department:"),
+                                                                       choices = dept_choices,
+                                                                       multiple = TRUE,
+                                                                       options = pickerOptions(
+                                                                         liveSearch = TRUE,
+                                                                         actionsBox = TRUE,
+                                                                         dropupAuto = FALSE,
+                                                                         size = 10),
+                                                                       selected = default_dept))),
+                                                ),
+                                                h2("3. Update any changes in the table below:"),
+                                                h2("4. When updates are complete, click on Submit Button below:"),
                                                 br(),
                                                 div(id = "header_custom_biomed",
                                                     h4("Your submitted changes will be reviewed for approval."),
                                                     br()
                                                 ),
-                                                rHandsontableOutput("biomed_kpi"),
+                                                h3("Option 1"),
+                                                rHandsontableOutput("cpsc_data_for_update"),
+                                                br(),
+                                                h3("Option 2"),
+                                                rHandsontableOutput("cpsc_data_for_update_2"),
+                                                br(),
                                                 hr(),
                                                 actionButton("submit_biomedkpis", "Submit", class = "btn-primary")
                                                 
