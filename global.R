@@ -121,8 +121,9 @@ colnames(cpsc_data) <- str_trim(colnames(cpsc_data))
 
 # Merge with Hire & Deactivation Date Data -------------------------------------
 cpsc_data <- cpsc_data %>%
-  mutate(Hired = 1900,
-         Deactivated = NA)
+  mutate(Site = NA, 
+         Hired = 1900,
+         Deactivated = 1900)
 
 
 ## Global Variables ------------------------------------------------------------

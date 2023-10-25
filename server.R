@@ -88,11 +88,6 @@ server <- function(input, output, session) {
     dept_input <- input$selectedDept
     specialty_input <- input$selectedSpecialty
     provider_input <- input$selectedProvider 
-    
-
-    # month_input <- "2023-08"
-    # dept_input <- "Cardiology"
-    # specialty_input <- "Cardiology: General"
 
     
     provider_filter <- unique((cpsc_data_filtered() %>% 
@@ -105,6 +100,14 @@ server <- function(input, output, session) {
       filter(Month == month_input,
              PROVIDER %in% provider_filter)
 
+    
+    # month_input <- "2023-08"
+    # dept_input <- "Cardiology"
+    # specialty_input <- "Cardiology: General"
+    # 
+    # cpsc_breakdown <- cpsc_data
+    
+    
     validate(
       need(!(is.na(dept_input)), "Please select at least one department")
     )
@@ -112,19 +115,30 @@ server <- function(input, output, session) {
     
     ## Process Table Output ====================================================
     cpsc_breakdown_tbl <- cpsc_breakdown %>%
-      dplyr::select(PROVIDER, NPI, Department, Specialty, Month, ReportedCFTE) %>%
+      dplyr::select(MasterDept, Site, PROVIDER, NPI, Hired, Deactivated, Department, Specialty, Month, ReportedCFTE) %>%
       group_by(Department) %>%
       mutate(inactive_dept = sum(ReportedCFTE)) %>%
       filter(inactive_dept > 0) %>%
       dplyr::select(-inactive_dept) %>%
       pivot_wider(names_from = "Department",
                   values_from = ReportedCFTE) %>%
-      mutate(NPI = as.character(NPI)) %>%
-      mutate(total_cfte = rowSums(across(where(is.numeric)), na.rm=TRUE))
+      mutate(NPI = as.character(NPI)) 
+    
+    cpsc_breakdown_tbl <- cpsc_breakdown_tbl %>%
+      ungroup() %>%
+      # mutate(total_cfte = rowSums(across(where(is.numeric)), na.rm=TRUE)) %>%
+      rowwise() %>%
+      mutate(total_CFTE = sum(c_across(c(9:length(cpsc_breakdown_tbl))), na.rm = T)) %>%
+      mutate(Hired = ifelse(Hired == 1900, NA, Hired),
+             Deactivated = ifelse(Deactivated == 1900, NA, Deactivated))
     
     ## Average YTD CFTE ========================================================
+    month_list <- sort(unique(cpsc_data$Month))
+    ytd_months <- month_list[1:which(month_list == month_input)]
+    
     avg_cfte <- cpsc_data_filtered() %>% 
       filter(PROVIDER %in% provider_filter) %>%
+      filter(Month %in% ytd_months) %>%
       filter(Year == substr(month_input, 1, 4)) %>%
       group_by(PROVIDER, NPI, Month) %>%
       summarise(total_cfte = sum(ReportedCFTE)) %>%
@@ -132,6 +146,8 @@ server <- function(input, output, session) {
       summarise(avg_cfte = mean(total_cfte, na.rm = TRUE))
     
     cpsc_breakdown_tbl$avg_cfte <- avg_cfte$avg_cfte[match(cpsc_breakdown_tbl$PROVIDER, avg_cfte$PROVIDER)]
+    cpsc_breakdown_tbl <- cpsc_breakdown_tbl %>%
+      arrange(PROVIDER)
     
     ## YTD % Clinical ==========================================================
     # cpsc_breakdown_tbl <- cpsc_breakdown_tbl %>%
@@ -141,18 +157,22 @@ server <- function(input, output, session) {
     
     ## Table Output ============================================================
     reactable(
-      cpsc_breakdown_tbl %>%
-        arrange(PROVIDER),
+      cpsc_breakdown_tbl,
       style = list(fontFamily = 'Calibri',
                    fontSize = '14px'),
       defaultColDef = colDef(align = "center",
-                             maxWidth = 180,
+                             maxWidth = 130,
                              headerStyle = list(background = "#210070", color = "white", fontWeight = "Bold", fontSize = "14px"),
                              headerClass = "bar-sort-header",
+                             format = colFormat(digits = 2),
                              style = function(value) {
                                if (is.na(value)) {
                                  background <- "#E0E0E0"
-                               } else {
+                               } 
+                               # else if (value == 0) {
+                               #   background <- "#E0E0E0"
+                               # } 
+                               else {
                                  background <- "white"
                                }
                                list(background = background)
@@ -167,23 +187,53 @@ server <- function(input, output, session) {
       
       columns = list(
         
+        MasterDept = colDef(
+          name = "Master Dept",
+          maxWidth = 180,
+          align = "left",
+          headerStyle = list(background = "white", color = "black", fontWeight = "Bold", fontSize = "14px")
+        ),
+        
+        Site = colDef(
+          maxWidth = 100,
+          align = "left",
+          headerStyle = list(background = "white", color = "black", fontWeight = "Bold", fontSize = "14px"),
+          style = list(background = "white")
+        ),
+        
         PROVIDER = colDef(
-          name = "Physician",
-          minWidth = 200,
+          name = "Provider",
+          maxWidth = 250,
           align = "left",
           headerStyle = list(background = "white", color = "black", fontWeight = "Bold", fontSize = "14px")
         ),
         
         NPI = colDef(
           name = "NPI",
-          minWidth = 90,
+          maxWidth = 90,
           align = "left",
           headerStyle = list(background = "white", color = "black", fontSize = "14px")
         ),
         
+        Hired = colDef(
+          name = "Hired Date",
+          maxWidth = 100,
+          align = "left",
+          headerStyle = list(background = "white", color = "black", fontSize = "14px"),
+          style = list(background = "white")
+        ),
+        
+        Deactivated = colDef(
+          name = "Deactivated Date",
+          maxWidth = 120,
+          align = "left",
+          headerStyle = list(background = "white", color = "black", fontSize = "14px"),
+          style = list(background = "white")
+        ),
+        
         Specialty = colDef(
           name = "CPSC Specialty",
-          minWidth = 200,
+          maxWidth = 300,
           align = "left",
           headerStyle = list(background = "white", color = "black", fontSize = "14px")
         ),
@@ -196,31 +246,30 @@ server <- function(input, output, session) {
           style = list(borderRight = "1.5px solid rgb(230, 230, 230)")
         ),
         
-        total_cfte = colDef(
+        total_CFTE = colDef(
           name = "Total CFTE",
           maxWidth = 130,
           headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
-          format = colFormat(digits = 1),
+          format = colFormat(digits = 2),
           # style = list(borderLeft = "1.5px solid rgb(230, 230, 230)")
           style = function(value) {
             if (value > 1) {
-              background <- "#f7c0bc"
-            } else if (value <= 1) {
-              background <- "#bbfcbb"
+              background <- "#ffcccc"
             } else {
-              color <- "#777"
+              background <- "white"
             }
             list(background = background, fontWeight = "bold", borderLeft = "1.5px solid rgb(230, 230, 230)")
           }
         ),
         
         avg_cfte = colDef(
-          name = paste0("Avg ",substr(month_input, 1, 4), " CFTE"),
+          # name = paste0("Avg ",month_input, " YTD CFTE"),
+          name = paste0("Avg ",substr(month_input, 1, 4), " YTD CFTE"),
           maxWidth = 130,
           align = "center",
-          headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "bold", color = "white", fontSize = "14px"),
-          format = colFormat(digits = 1),
-          style = list(borderRight = "1.5px solid rgb(230, 230, 230)", fontWeight = "bold")
+          headerStyle = list(background = "#00aeef", color = "white", fontWeight = "bold", color = "white", fontSize = "14px"),
+          format = colFormat(digits = 2),
+          style = list(borderLeft = "1.5px solid rgb(230, 230, 230)", borderRight = "1.5px solid rgb(230, 230, 230)", fontWeight = "bold")
         )
         
         # blank = colDef(

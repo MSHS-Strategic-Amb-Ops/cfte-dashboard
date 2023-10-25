@@ -114,7 +114,13 @@ ui <-
                                                    actionsBox = TRUE,
                                                    dropupAuto = FALSE,
                                                    size = 10),
-                                                 selected = default_provider)))
+                                                 selected = default_provider))),
+                            column(2,
+                                   box(
+                                     title = NULL, solidHeader = FALSE, width = 12,
+                                     radioButtons("selectedDeactivated", label = h4("Deactivated Providers:"), 
+                                                 choices = list("Include" = 1, "Exclude" = 2),
+                                                 selected = 1)))
                           ),
                           hr(),
                           # fluidRow(textOutput("siteComp_title")),
